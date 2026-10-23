@@ -1,0 +1,13 @@
+{
+  "name": "claude-pokemon-egg",
+  "description": "세션마다 포켓몬 알을 키우는 Claude Code mod",
+  "owner": {
+    "name": "reeny404"
+  },
+  "plugins": [
+    {
+      "name": "pokemon-egg",
+      "source": "./"
+    }
+  ]
+}
