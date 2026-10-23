@@ -211,6 +211,25 @@ test('/clear 는 알을 새 세션 id 로 옮기고, 세션이 닫히면 닫힌 
   await clock.advance(1000)
 })
 
+test('classic.SessionStart 가 오지 않아도 /clear 뒤 첫 프롬프트에서 알을 새 세션 id 로 옮긴다', async ($, on) => {
+  let id = 's1'
+  const { store, clock } = engine(on, { id: () => id })
+  await $.session.start({ source: 'startup', cwd: '/p/app' } as never)
+  await $.session.end({ reason: 'clear', sessionId: 's1' } as never)
+  id = 's2'
+  await $.prompt.submit({ text: '이어서' } as never)
+  expect(store['egg:s1']).toBeUndefined()
+  expect(store['egg:s2']).toMatchObject({ key: 's1', endedAt: null })
+
+  // /clear 가 아니게 바뀐 세션은 자기 알을 새로 받는다
+  await $.session.end({ reason: 'resume', sessionId: 's2' } as never)
+  id = 's3'
+  await $.prompt.submit({ text: '다른 세션' } as never)
+  expect(store['egg:s2']).toMatchObject({ key: 's1', endedAt: NOW })
+  expect(store['egg:s3']).toMatchObject({ key: 's3' })
+  await clock.advance(1000)
+})
+
 test('처음 켜면 mod-hud 의 박스를 한 번 옮겨 오고, box 와 dex 명령이 보인다', async ($, on) => {
   const legacy = JSON.stringify({
     box: [

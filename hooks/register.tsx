@@ -73,6 +73,8 @@ const monKey = (key: string) => `mon:${key}`
 const claimKey = (root: string, branch: string, mr: Mr) => `mr:${root}\t${branch}\t${mr.iid}`
 
 let sessionId = ''
+// /clear 로 끝난 세션 id. 이어지는 새 세션 id 가 이 세션의 알을 받는다
+let clearedFrom: string | null = null
 // 지금 턴이 일하기 시작한 시각, 또는 일한 시간을 마지막으로 더한 시각. 쉬는 중이면 null
 let workingSince: number | null = null
 // 아직 알에 더하지 않은 도구 횟수
@@ -130,6 +132,24 @@ async function takeEgg($: EngineInterface, id: string) {
   if (partner) {
     loadSprite($, partner.species)
   }
+}
+
+// 세션 id 가 바뀌었으면 그 세션의 알로 바꾼다. /clear 로 바뀐 것이면 같은 일을 잇는 것이라 알을 그대로 넘긴다
+// classic.SessionStart 가 mod 에 오지 않는 환경이 있어 다음 프롬프트에서도 확인한다
+async function followSession($: EngineInterface) {
+  const id = await $.session.id()
+  if (!sessionId || id === sessionId) {
+    return
+  }
+  if (clearedFrom === sessionId) {
+    const carried = await readEgg($, sessionId)
+    if (carried) {
+      await $.store.set(eggKey(id), { ...carried, endedAt: null })
+      await $.store.delete(eggKey(sessionId))
+    }
+  }
+  clearedFrom = null
+  await takeEgg($, id)
 }
 
 // ---- 일한 시간과 도구
@@ -280,6 +300,7 @@ async function checkMr($: EngineInterface, saved: SessionEgg, now: number, isOwn
     return { ...saved, mr }
   }
   const claim = claimKey(root, branch, mr)
+  // shortcut: 읽고 쓰는 사이에 다른 세션이 같은 MR 머지를 보면 둘 다 보상받을 수 있음, $.store 에 비교 후 쓰기가 생기면 그걸로 바꾼다
   const owner = (await $.store.get(claim)) as string | undefined
   if (owner && owner !== saved.key) {
     return { ...saved, mr, merged: true }
@@ -315,6 +336,7 @@ async function checkMrs($: EngineInterface) {
     await editOwnEgg($, saved => ({ ...saved, mr: checked.mr, merged: checked.merged, mon: checked.mon }))
   }
   // 닫힌 세션의 알은 열린 세션 중 한 곳만 본다
+  // shortcut: 두 세션이 같은 순간 시각을 읽으면 둘 다 닫힌 세션의 알을 봄, 보상은 claim 이 막으니 MR 조회만 겹친다
   const last = Number((await $.store.get('poll:at')) ?? 0)
   if (now - last < MR_CHECK_MS) {
     return
@@ -325,6 +347,7 @@ async function checkMrs($: EngineInterface) {
       continue
     }
     const saved = await readEgg($, key.slice('egg:'.length))
+    // shortcut: 3일 넘게 일하지 않고 열어만 둔 세션도 닫힌 것으로 봄, 세션이 살아 있다는 표시를 따로 남길 때 그걸로 가린다
     const endedAt = saved?.endedAt ?? (saved && now - saved.savedAt > STALE_MS ? saved.savedAt : null)
     if (!saved || endedAt === null) {
       continue
@@ -629,21 +652,15 @@ export const register: Register = (on, options) => {
   // /clear 는 새 세션 id 로 이어지고 session.start 가 다시 오지 않는다. 같은 일을 잇는 것이라 알도 그대로 넘긴다
   // 세션 안에서 /resume 으로 다른 세션을 열면 그 세션의 알로 바꾼다
   on('classic.SessionStart', async ($, e, next) => {
-    const id = await $.session.id()
-    if (sessionId && id !== sessionId) {
-      if (e.source === 'clear') {
-        const carried = await readEgg($, sessionId)
-        if (carried) {
-          await $.store.set(eggKey(id), { ...carried, endedAt: null })
-          await $.store.delete(eggKey(sessionId))
-        }
-      }
-      await takeEgg($, id)
+    if (e.source === 'clear') {
+      clearedFrom = sessionId
     }
+    await followSession($)
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('prompt.submit', async ($, e, next) => {
+    await followSession($)
     workingSince ??= await $.clock.now()
     return next(e)
   }).catch(($, e, next) => next(e))
@@ -678,7 +695,9 @@ export const register: Register = (on, options) => {
     await flush($)
     workingSince = null
     // /clear 는 다음 세션이 알을 이어 받는다
-    if (e.reason !== 'clear') {
+    if (e.reason === 'clear') {
+      clearedFrom = sessionId
+    } else {
       const now = await $.clock.now()
       await editOwnEgg($, saved => ({ ...saved, endedAt: now }))
     }

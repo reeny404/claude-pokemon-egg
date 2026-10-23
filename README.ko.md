@@ -59,3 +59,7 @@ claude plugin validate .
 claude plugin test .
 claude --plugin-dir .
 ```
+
+## 라이선스
+
+MIT. 포켓몬과 포켓몬 이름은 Nintendo, Creatures Inc., GAME FREAK inc. 의 상표입니다. 스프라이트와 이름은 실행 중에 [PokeAPI](https://pokeapi.co) 에서 받아 오며 이 저장소에 들어 있지 않습니다.

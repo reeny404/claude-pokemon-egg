@@ -59,3 +59,7 @@ claude plugin validate .
 claude plugin test .
 claude --plugin-dir .
 ```
+
+## License
+
+MIT. Pokémon and Pokémon names are trademarks of Nintendo, Creatures Inc. and GAME FREAK inc. Sprites and names are fetched from [PokeAPI](https://pokeapi.co) at runtime and are not part of this repository.

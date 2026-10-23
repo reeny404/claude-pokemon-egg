@@ -1,10 +1,11 @@
 {
   "name": "pokemon-egg",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "세션마다 포켓몬 알 하나를 입력창 위에서 키운다. 세션이 일한 시간과 MR 머지로 경험치가 쌓이고, 세션이 쓴 도구에 따라 깨어날 포켓몬의 타입이 기운다",
   "author": {
     "name": "reeny404"
   },
+  "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
     "gitlabUrl": {
